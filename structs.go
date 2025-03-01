@@ -60,3 +60,8 @@ type resolution struct {
 	height  int
 	bitrate string
 }
+
+type lang_count struct {
+	lang  string
+	count int
+}

@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"slices"
+	"strconv"
 	"strings"
 )
 
@@ -63,10 +65,38 @@ func encode(input_file string, output_file string) {
 
 	json.Unmarshal(output, &result)
 
-	var ffmpeg_command []string = []string{"-hwaccel", "cuda", "-i", input_file, "-filter_complex"}
-
 	num_audio := len(result.Streams)
 	num_resolution := len(resolution)
+
+	var lang []string
+	for i := 0; i < num_audio; i++ {
+		lang = append(lang, result.Streams[i].Tags.Language)
+	}
+
+	temp := lang
+	var count []lang_count
+	for i := 0; i < num_audio; i++ {
+		x, temp := temp[0], temp[1:]
+		if slices.Contains(temp, x) {
+			var found bool = false
+			for ii := 0; i < len(count); ii++ {
+				if count[ii].lang == x {
+					found = true
+					count[ii].count += 1
+					lang[i] = x + strconv.Itoa(count[ii].count)
+					break
+				}
+			}
+
+			if !found {
+				count = append(count, lang_count{lang: x, count: 2})
+				lang[i] = x + strconv.Itoa(2)
+			}
+
+		}
+	}
+
+	var ffmpeg_command []string = []string{"-i", input_file, "-filter_complex"}
 
 	var filter_complex string
 	filter_complex += fmt.Sprintf("[0:v:0]split=%d", num_resolution)
@@ -82,11 +112,11 @@ func encode(input_file string, output_file string) {
 	ffmpeg_command = append(ffmpeg_command, filter_complex)
 
 	for i := 0; i < num_resolution; i++ {
-		ffmpeg_command = append(ffmpeg_command, []string{"-map", fmt.Sprintf("[v%dout]", i), fmt.Sprintf("-c:v:%d", i), "h264_nvenc", fmt.Sprintf("-b:v:%d", i), resolution[i].bitrate, "-preset", "medium", fmt.Sprintf("-s:v:%d", i), fmt.Sprintf("%dx%d", resolution[i].width, resolution[i].height)}...)
+		ffmpeg_command = append(ffmpeg_command, []string{"-map", fmt.Sprintf("[v%dout]", i), fmt.Sprintf("-c:v:%d", i), "h264_nvenc", fmt.Sprintf("-b:v:%d", i), resolution[i].bitrate, "-preset", "medium", "-profile:v", "main", fmt.Sprintf("-s:v:%d", i), fmt.Sprintf("%dx%d", resolution[i].width, resolution[i].height)}...)
 	}
 
 	for i := 0; i < num_audio; i++ {
-		ffmpeg_command = append(ffmpeg_command, []string{"-map", fmt.Sprintf("0:a:%d", i), fmt.Sprintf("-c:a:%d", i), "aac", fmt.Sprintf("-b:a:%d", i), "128k", fmt.Sprintf("-metadata:s:a:%d", i), fmt.Sprintf("language=%s", result.Streams[i].Tags.Language)}...)
+		ffmpeg_command = append(ffmpeg_command, []string{"-map", fmt.Sprintf("0:a:%d", i), fmt.Sprintf("-c:a:%d", i), "aac", "-ac", "2", fmt.Sprintf("-b:a:%d", i), "128k", fmt.Sprintf("-metadata:s:a:%d", i), fmt.Sprintf("language=%s", lang[i])}...)
 	}
 
 	ffmpeg_command = append(ffmpeg_command, []string{"-f", "hls", "-hls_time", "10", "-hls_list_size", "0", "-hls_flags", "independent_segments", "-master_pl_name", "master.m3u8", "-var_stream_map"}...)
@@ -99,10 +129,10 @@ func encode(input_file string, output_file string) {
 
 	for i := 0; i < num_audio; i++ {
 		if i == num_audio-1 {
-			stream_map += fmt.Sprintf("a:%d,agroup:audio,language:%s,name:audio_%s,default:yes", i, strings.ToUpper(result.Streams[i].Tags.Language), result.Streams[i].Tags.Language)
+			stream_map += fmt.Sprintf("a:%d,agroup:audio,language:%s,name:audio_%s,default:yes", i, strings.ToUpper(lang[i]), lang[i])
 			break
 		}
-		stream_map += fmt.Sprintf("a:%d,agroup:audio,language:%s,name:audio_%s ", i, strings.ToUpper(result.Streams[i].Tags.Language), result.Streams[i].Tags.Language)
+		stream_map += fmt.Sprintf("a:%d,agroup:audio,language:%s,name:audio_%s ", i, strings.ToUpper(lang[i]), lang[i])
 	}
 
 	ffmpeg_command = append(ffmpeg_command, stream_map)
