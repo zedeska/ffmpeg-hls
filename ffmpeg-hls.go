@@ -112,7 +112,7 @@ func encode(input_file string, output_file string) {
 	ffmpeg_command = append(ffmpeg_command, filter_complex)
 
 	for i := 0; i < num_resolution; i++ {
-		ffmpeg_command = append(ffmpeg_command, []string{"-map", fmt.Sprintf("[v%dout]", i), fmt.Sprintf("-c:v:%d", i), "h264_nvenc", fmt.Sprintf("-b:v:%d", i), resolution[i].bitrate, "-preset", "medium", "-profile:v", "main", fmt.Sprintf("-s:v:%d", i), fmt.Sprintf("%dx%d", resolution[i].width, resolution[i].height)}...)
+		ffmpeg_command = append(ffmpeg_command, []string{"-map", fmt.Sprintf("[v%dout]", i), fmt.Sprintf("-c:v:%d", i), "h264_nvenc", fmt.Sprintf("-b:v:%d", i), resolution[i].bitrate, "-preset", "medium", "-profile:v", "main", "-pix_fmt", "yuv420p", fmt.Sprintf("-s:v:%d", i), fmt.Sprintf("%dx%d", resolution[i].width, resolution[i].height)}...)
 	}
 
 	for i := 0; i < num_audio; i++ {
@@ -139,8 +139,10 @@ func encode(input_file string, output_file string) {
 	ffmpeg_command = append(ffmpeg_command, []string{"-hls_segment_filename", output_file + "/%v/segment_%03d.ts", output_file + "/%v/manifest.m3u8"}...)
 
 	//fmt.Println(ffmpeg_command)
-	_, err := exec.Command("ffmpeg", ffmpeg_command...).Output()
-	if err != nil {
+	cmd := exec.Command("ffmpeg", ffmpeg_command...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
 		fmt.Println(err)
 		return
 	}
