@@ -96,7 +96,7 @@ func encode(input_file string, output_file string) {
 		}
 	}
 
-	var ffmpeg_command []string = []string{"-hwaccel", "cuda", "-hwaccel_output_format", "cuda", "-i", input_file, "-filter_complex"}
+	var ffmpeg_command []string = []string{"-hwaccel", "cuda", "-i", input_file, "-filter_complex"}
 
 	var filter_complex string
 	filter_complex += fmt.Sprintf("[0:v:0]split=%d", num_resolution)
