@@ -31,7 +31,6 @@ func main() {
 		encode(*file, output)
 	} else if *folder != "null" {
 		entries, _ := os.ReadDir(*folder)
-		fmt.Println(entries)
 		for _, e := range entries {
 			temp := strings.Split(*folder+"\\"+e.Name(), ".")
 			if temp[len(temp)-1] == "mkv" || temp[len(temp)-1] == "mp4" {
@@ -75,10 +74,17 @@ func encode(input_file string, output_file string) {
 
 	temp := lang
 	var count []lang_count
+	var found bool = false
+
 	for i := 0; i < num_audio; i++ {
-		x, temp := temp[0], temp[1:]
+		if len(temp) <= 1 {
+			break
+		}
+		x := temp[0]
+		temp = temp[1:]
+
 		if slices.Contains(temp, x) {
-			var found bool = false
+			found = false
 			for ii := 0; i < len(count); ii++ {
 				if count[ii].lang == x {
 					found = true
@@ -92,7 +98,6 @@ func encode(input_file string, output_file string) {
 				count = append(count, lang_count{lang: x, count: 2})
 				lang[i] = x + strconv.Itoa(2)
 			}
-
 		}
 	}
 
@@ -147,4 +152,5 @@ func encode(input_file string, output_file string) {
 		return
 	}
 	fmt.Println("success")
+
 }
