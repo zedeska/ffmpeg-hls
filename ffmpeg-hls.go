@@ -43,7 +43,8 @@ func main() {
 }
 
 func encode(input_file string, output_file string) {
-	var result ffprobe_audio
+	var result_audio ffprobe_audio
+	var result_subtitle ffprobe_subtitle
 
 	var resolution []resolution = []resolution{
 		{
@@ -58,48 +59,42 @@ func encode(input_file string, output_file string) {
 		},
 	}
 
-	ffprobe := exec.Command("ffprobe", "-v", "error", "-select_streams", "a", "-show_entries", "stream", "-of", "json", input_file)
+	ffprobe_audio := exec.Command("ffprobe", "-v", "error", "-select_streams", "a", "-show_entries", "stream", "-of", "json", input_file)
+	ffprobe_subtitle := exec.Command("ffprobe", "-v", "error", "-select_streams", "s", "-show_entries", "stream", "-of", "json", input_file)
 
-	output, _ := ffprobe.Output()
+	output_audio, _ := ffprobe_audio.Output()
+	output_subtitle, _ := ffprobe_subtitle.Output()
 
-	json.Unmarshal(output, &result)
+	json.Unmarshal(output_audio, &result_audio)
+	json.Unmarshal(output_subtitle, &result_subtitle)
 
-	num_audio := len(result.Streams)
+	num_subs := len(result_subtitle.Streams)
+	num_audio := len(result_audio.Streams)
 	num_resolution := len(resolution)
+
+	if num_subs > 0 {
+		var subs []string
+		for i := 0; i < num_subs; i++ {
+			subs = append(subs, result_subtitle.Streams[i].Tags.Language)
+		}
+
+		check_lang_dup(subs)
+
+		for i := 0; i < num_subs; i++ {
+			f := exec.Command("ffmpeg", "-i", input_file, "-map", "0:s:"+strconv.Itoa(i), "-f", "webvtt", output_file+"/"+subs[i]+".vtt")
+			f.Stdout = os.Stdout
+			f.Stderr = os.Stderr
+			f.Run()
+		}
+
+	}
 
 	var lang []string
 	for i := 0; i < num_audio; i++ {
-		lang = append(lang, result.Streams[i].Tags.Language)
+		lang = append(lang, result_audio.Streams[i].Tags.Language)
 	}
 
-	temp := lang
-	var count []lang_count
-	var found bool = false
-
-	for i := 0; i < num_audio; i++ {
-		if len(temp) <= 1 {
-			break
-		}
-		x := temp[0]
-		temp = temp[1:]
-
-		if slices.Contains(temp, x) {
-			found = false
-			for ii := 0; i < len(count); ii++ {
-				if count[ii].lang == x {
-					found = true
-					count[ii].count += 1
-					lang[i] = x + strconv.Itoa(count[ii].count)
-					break
-				}
-			}
-
-			if !found {
-				count = append(count, lang_count{lang: x, count: 2})
-				lang[i] = x + strconv.Itoa(2)
-			}
-		}
-	}
+	check_lang_dup(lang)
 
 	var ffmpeg_command []string = []string{"-hwaccel", "cuda", "-i", input_file, "-filter_complex"}
 
@@ -153,4 +148,35 @@ func encode(input_file string, output_file string) {
 	}
 	fmt.Println("success")
 
+}
+
+func check_lang_dup(list []string) {
+	temp := list
+	var count []lang_count
+	var found bool = false
+
+	for i := 0; i < len(list); i++ {
+		if len(temp) <= 1 {
+			break
+		}
+		x := temp[0]
+		temp = temp[1:]
+
+		if slices.Contains(temp, x) {
+			found = false
+			for ii := 0; i < len(count); ii++ {
+				if count[ii].lang == x {
+					found = true
+					count[ii].count += 1
+					list[i] = x + strconv.Itoa(count[ii].count)
+					break
+				}
+			}
+
+			if !found {
+				count = append(count, lang_count{lang: x, count: 2})
+				list[i] = x + strconv.Itoa(2)
+			}
+		}
+	}
 }
