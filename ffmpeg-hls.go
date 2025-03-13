@@ -75,7 +75,11 @@ func encode(input_file string, output_file string) {
 	if num_subs > 0 {
 		var subs []string
 		for i := 0; i < num_subs; i++ {
-			subs = append(subs, result_subtitle.Streams[i].Tags.Title)
+			if result_subtitle.Streams[i].Tags.Title == "" {
+				subs = append(subs, result_subtitle.Streams[i].Tags.Language)
+			} else {
+				subs = append(subs, result_subtitle.Streams[i].Tags.Title)
+			}
 		}
 
 		check_lang_dup(subs)
