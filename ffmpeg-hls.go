@@ -100,7 +100,18 @@ func encode(input_file string, output_file string) {
 
 	check_lang_dup(lang)
 
-	var ffmpeg_command []string = []string{"-hwaccel", "cuda", "-i", input_file, "-filter_complex"}
+	var hwaccel string
+	var encoder string
+	gpu := getGPU()
+	if strings.Contains(gpu, "AMD") {
+		hwaccel = "d3d11va"
+		encoder = "h264_amf"
+	} else if strings.Contains(gpu, "NVIDIA") {
+		hwaccel = "cuda"
+		encoder = "h264_nvenc"
+	}
+
+	var ffmpeg_command []string = []string{"-hwaccel", hwaccel, "-i", input_file, "-filter_complex"}
 
 	var filter_complex string
 	filter_complex += fmt.Sprintf("[0:v:0]split=%d", num_resolution)
@@ -116,7 +127,7 @@ func encode(input_file string, output_file string) {
 	ffmpeg_command = append(ffmpeg_command, filter_complex)
 
 	for i := 0; i < num_resolution; i++ {
-		ffmpeg_command = append(ffmpeg_command, []string{"-map", fmt.Sprintf("[v%dout]", i), fmt.Sprintf("-c:v:%d", i), "h264_nvenc", fmt.Sprintf("-b:v:%d", i), resolution[i].bitrate, "-preset", "medium", "-profile:v", "main", "-pix_fmt", "yuv420p", fmt.Sprintf("-s:v:%d", i), fmt.Sprintf("%dx%d", resolution[i].width, resolution[i].height)}...)
+		ffmpeg_command = append(ffmpeg_command, []string{"-map", fmt.Sprintf("[v%dout]", i), fmt.Sprintf("-c:v:%d", i), encoder, fmt.Sprintf("-b:v:%d", i), resolution[i].bitrate, "-preset", "medium", "-profile:v", "main", "-pix_fmt", "yuv420p", fmt.Sprintf("-s:v:%d", i), fmt.Sprintf("%dx%d", resolution[i].width, resolution[i].height)}...)
 	}
 
 	for i := 0; i < num_audio; i++ {
@@ -183,4 +194,11 @@ func check_lang_dup(list []string) {
 			}
 		}
 	}
+}
+
+func getGPU() string {
+	Info := exec.Command("cmd", "/C", "wmic path win32_VideoController get name")
+	History, _ := Info.Output()
+
+	return strings.TrimSpace(strings.Replace(string(History), "Name", "", -1))
 }
