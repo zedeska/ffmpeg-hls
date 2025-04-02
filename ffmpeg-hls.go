@@ -78,7 +78,7 @@ func encode(input_file string, output_file string) {
 			if result_subtitle.Streams[i].Tags.Title == "" {
 				subs = append(subs, result_subtitle.Streams[i].Tags.Language)
 			} else {
-				subs = append(subs, result_subtitle.Streams[i].Tags.Title)
+				subs = append(subs, strings.Replace(result_subtitle.Streams[i].Tags.Title, "/", "", -1))
 			}
 		}
 
